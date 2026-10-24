@@ -54,24 +54,78 @@ internal static class BossZoneLocator
 		}
 		_nextRefresh = Time.realtimeSinceStartup + 5f;
 		List<BotZone> list = new List<BotZone>();
+
+		// 首选：直接读 LocationScene.BotZones 字段。
+		// 不能用 LocationScene.GetAllObjects<BotZone>()：它查的是 _typeToContainer，
+		// 而 LocationScene 里的 Register(BotZones) 可能在地形数组填充之前执行，
+		// 于是登记进容器的是个空数组，之后不会再更新 —— 实测在 Streets 上永远返回 0 个 zone。
+		int sceneZones = 0;
 		try
 		{
-			foreach (BotZone item in LocationScene.GetAllObjects<BotZone>(withDisabled: true))
+			List<LocationScene> scenes = LocationScene.LoadedScenes;
+			if (scenes != null)
 			{
-				if (!((Object)(object)item == (Object)null))
+				for (int s = 0; s < scenes.Count; s++)
 				{
-					list.Add(item);
+					LocationScene scene = scenes[s];
+					if ((Object)(object)scene == (Object)null)
+					{
+						continue;
+					}
+					BotZone[] array = scene.BotZones;
+					if (array == null)
+					{
+						continue;
+					}
+					for (int i = 0; i < array.Length; i++)
+					{
+						BotZone zone = array[i];
+						if (!((Object)(object)zone == (Object)null))
+						{
+							list.Add(zone);
+						}
+					}
 				}
 			}
+			sceneZones = list.Count;
 		}
 		catch (System.Exception ex)
 		{
-			BossNotifierPlugin.Log(LogLevel.Warning, "BotZone lookup failed: " + ex.Message);
+			BossNotifierPlugin.Log(LogLevel.Warning, "LocationScene.BotZones lookup failed: " + ex.Message);
 		}
+
+		// 兜底：直接扫已加载对象（含未激活），不依赖场景登记表。
+		if (list.Count == 0)
+		{
+			try
+			{
+				BotZone[] all = Resources.FindObjectsOfTypeAll<BotZone>();
+				if (all != null)
+				{
+					for (int i = 0; i < all.Length; i++)
+					{
+						BotZone zone = all[i];
+						if (!((Object)(object)zone == (Object)null))
+						{
+							list.Add(zone);
+						}
+					}
+				}
+			}
+			catch (System.Exception ex2)
+			{
+				BossNotifierPlugin.Log(LogLevel.Warning, "FindObjectsOfTypeAll<BotZone> failed: " + ex2.Message);
+			}
+		}
+
 		if (list.Count != 0)
 		{
 			_zones = list.ToArray();
-			BossNotifierPlugin.Log(LogLevel.Info, $"Cached {_zones.Length} BotZone(s) for client-side zone resolution");
+			BossNotifierPlugin.Log(LogLevel.Info, $"Cached {_zones.Length} BotZone(s) for zone resolution (scene field: {sceneZones})");
+		}
+		else
+		{
+			BossNotifierPlugin.Log(LogLevel.Warning, "No BotZone found yet - zone names unavailable, will retry");
 		}
 		return _zones;
 	}
@@ -92,7 +146,7 @@ internal static class BossZoneLocator
 			{
 				continue;
 			}
-			if (string.IsNullOrEmpty(BossNotifierPlugin.GetZoneName(botZone.name)))
+			if (string.IsNullOrEmpty(botZone.name))
 			{
 				continue;
 			}

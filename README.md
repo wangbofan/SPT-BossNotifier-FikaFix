@@ -4,7 +4,7 @@
 
 这个仓库是修复版，**替换原来的 `BossNotifier.dll` 即可**，配置文件与 `custom_bosses.json` 全部兼容，不需要重新配置。
 
-修复版版本号 **`1.2.1.3`**（BepInEx 插件列表与日志里能看到；文件属性 `ProductVersion = 1.2.1-fika.3`），插件 GUID 仍是 `Mattexe.BossNotifier`，所以配置文件名不变。
+修复版版本号 **`1.2.1.4`**（BepInEx 插件列表与日志里能看到；文件属性 `ProductVersion = 1.2.1-fika.4`），插件 GUID 仍是 `Mattexe.BossNotifier`，所以配置文件名不变。
 
 下载：见 [Releases](https://github.com/wangbofan/SPT-BossNotifier-FikaFix/releases)，或直接取仓库里的 `dist/BossNotifier.dll`。
 
@@ -62,12 +62,19 @@ public static bool CanRenderUi
 
 ### `BossZoneLocator.cs`（新增）
 
-客户端没有 `BossLocationSpawn.BornZone`，改用 boss 当前坐标反查最近的 `BotZone`：
+客户端没有 `BossLocationSpawn.BornZone`，改用 boss 坐标反查最近的 `BotZone`：
 
 ```csharp
-LocationScene.GetAllObjects<BotZone>(withDisabled: true)   // 缓存 5 秒
+// 首选：直接读场景字段
+LocationScene.LoadedScenes[i].BotZones
+// 兜底：直接扫已加载对象（含未激活）
+Resources.FindObjectsOfTypeAll<BotZone>()
 // 距离优先用 SpawnPointMarkers，退化到 CenterOfSpawnPoints，再退化到 transform.position
 ```
+
+> ⚠️ 反例：**不要**用 `LocationScene.GetAllObjects<BotZone>()`。它查的是 `_typeToContainer`，而 `LocationScene.Init()` 里的 `Register(BotZones)` 可能在地形数组被 `FillArraysFrom` 填充之前执行，登记进去的是个空数组、之后不再更新 —— 实测在 Streets 上永远返回 0 个 zone，提示就退化成 “X has been located.”，说不出在哪。
+
+区域名还会**延迟补解析**：开局那一刻 `BotZone` 可能还没加载完，`bossesInRaid` 里会先留下空区域名；之后每次生成提示（按 O、附近播报、boss 死亡）都会用 boss **首次被看到时的坐标**再查一次，补上就写回 `bossesInRaid`。
 
 这样客户端也能给出区域名，而不是只播 “X has been located.”。
 
@@ -136,6 +143,10 @@ Sending 1 boss notification(s): Reshala has been located near Dormitory.
 | `Fika detected` 之后没了 | `TryBeginUi` 一直没等到本地玩家 |
 | 有 `UI ready` 无 `Bot data arrived` | 整局一个 AI 都没收到（bot 全关？） |
 | 有 `Sending ...` 但屏上没字 | 通知显示链路问题，不是数据问题 |
+| 有 `Cached N BotZone(s)`，N≥1 | 区域反查可用，播报会带 `near <地名>` |
+| `No BotZone found yet` | 场景里还没找到 BotZone，会每 5 秒重试；此时先播 “has been located.”，之后自动补上地名 |
+
+`Late-resolved zone for <Boss>: <地名>` 表示开局没查到、后来补上了。
 
 ---
 

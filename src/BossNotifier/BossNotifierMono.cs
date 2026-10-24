@@ -390,6 +390,10 @@ public class BossNotifierMono : MonoBehaviour
 			UpdateMarkerPosition(val, player);
 			val.SetActive(_markersVisible && BossNotifierPlugin.enableMarkers.Value);
 			BossMarkerInfo value = new BossMarkerInfo(player, bossName, groupName, val, val3, val5);
+			if (!((Object)(object)player == (Object)null))
+			{
+				value.FirstSeenPosition = player.Position;
+			}
 			_bossMarkers[player] = value;
 			if (BossNotifierPlugin.pluralBosses.Contains(groupName) || BossNotifierPlugin.customBossGroups.Contains(groupName))
 			{
@@ -764,6 +768,51 @@ public class BossNotifierMono : MonoBehaviour
 		}
 	}
 
+	private float _nextZoneRefresh;
+
+	/// <summary>
+	/// 区域名的“迟到补救”。
+	///
+	/// 开局那一刻 boss 已经被认出来了，但 BotZone 可能还没加载完（实测 Streets 上首次查询拿到 0 个），
+	/// 于是 bossesInRaid 里留下空区域名，提示永远退化成 “X has been located.”。
+	/// 每次生成提示前再试一次：只要 boss 还活着，就按它当前位置补出区域名。
+	/// </summary>
+	private void RefreshBossZones()
+	{
+		if (Time.realtimeSinceStartup < _nextZoneRefresh)
+		{
+			return;
+		}
+		_nextZoneRefresh = Time.realtimeSinceStartup + 2f;
+		if (_bossMarkers.Count == 0)
+		{
+			return;
+		}
+		foreach (KeyValuePair<Player, BossMarkerInfo> bossMarker in _bossMarkers)
+		{
+			if ((Object)(object)bossMarker.Key == (Object)null)
+			{
+				continue;
+			}
+			BossMarkerInfo value = bossMarker.Value;
+			if (value == null || string.IsNullOrEmpty(value.GroupName))
+			{
+				continue;
+			}
+			if (BossLocationSpawnPatch.bossesInRaid.TryGetValue(value.GroupName, out string zone) && !string.IsNullOrEmpty(zone))
+			{
+				continue;
+			}
+			string text = BossZoneLocator.GetZoneNameAt((value.FirstSeenPosition == Vector3.zero) ? bossMarker.Key.Position : value.FirstSeenPosition);
+			if (string.IsNullOrEmpty(text))
+			{
+				continue;
+			}
+			BossLocationSpawnPatch.bossesInRaid[value.GroupName] = text;
+			BossNotifierPlugin.Log((LogLevel)16, $"Late-resolved zone for {value.GroupName}: {text}");
+		}
+	}
+
 	public void GenerateBossNotifications()
 	{
 		try
@@ -779,6 +828,7 @@ public class BossNotifierMono : MonoBehaviour
 
 	private void GenerateBossNotificationsInternal()
 	{
+		RefreshBossZones();
 		bossNotificationMessages = new List<string>();
 		bool flag = IsDay();
 		bool flag2 = intelCenterLevel >= BossNotifierPlugin.intelCenterLocationUnlockLevel.Value;
