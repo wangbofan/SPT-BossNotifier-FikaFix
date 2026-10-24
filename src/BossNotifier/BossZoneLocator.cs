@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using BepInEx.Logging;
 using EFT;
 using EFT.Game.Spawning;
@@ -125,9 +126,47 @@ internal static class BossZoneLocator
 		}
 		else
 		{
-			BossNotifierPlugin.Log(LogLevel.Warning, "No BotZone found yet - zone names unavailable, will retry");
+			BossNotifierPlugin.Log(LogLevel.Warning, "No BotZone found yet - zone names unavailable, will retry :: " + DescribeScene());
 		}
 		return _zones;
+	}
+
+	/// <summary>
+	/// 诊断用：把场景里到底有没有 BotZone / SpawnPointMarker 打出来，
+	/// 免得靠猜（客户端可能根本没有 BotZone 组件）。
+	/// </summary>
+	private static string DescribeScene()
+	{
+		StringBuilder stringBuilder = new StringBuilder();
+		try
+		{
+			List<LocationScene> scenes = LocationScene.LoadedScenes;
+			stringBuilder.Append("LoadedScenes=").Append((scenes == null) ? (-1) : scenes.Count);
+			if (scenes != null)
+			{
+				for (int i = 0; i < scenes.Count && i < 4; i++)
+				{
+					LocationScene locationScene = scenes[i];
+					if ((Object)(object)locationScene == (Object)null)
+					{
+						stringBuilder.Append(" [null]");
+						continue;
+					}
+					stringBuilder.Append(" [").Append(locationScene.gameObject.name).Append(": zones=");
+					stringBuilder.Append((locationScene.BotZones == null) ? (-1) : locationScene.BotZones.Length);
+					stringBuilder.Append(" spm=");
+					stringBuilder.Append((locationScene.SpawnPointMarkers == null) ? (-1) : locationScene.SpawnPointMarkers.Length);
+					stringBuilder.Append(']');
+				}
+			}
+			stringBuilder.Append(" allBotZone=").Append(Resources.FindObjectsOfTypeAll<BotZone>().Length);
+			stringBuilder.Append(" allSpm=").Append(Resources.FindObjectsOfTypeAll<SpawnPointMarker>().Length);
+		}
+		catch (System.Exception ex)
+		{
+			stringBuilder.Append(" (diag failed: ").Append(ex.Message).Append(')');
+		}
+		return stringBuilder.ToString();
 	}
 
 	private static BotZone FindNearest(Vector3 position)

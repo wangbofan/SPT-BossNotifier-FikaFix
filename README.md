@@ -4,7 +4,7 @@
 
 这个仓库是修复版，**替换原来的 `BossNotifier.dll` 即可**，配置文件与 `custom_bosses.json` 全部兼容，不需要重新配置。
 
-修复版版本号 **`1.2.1.4`**（BepInEx 插件列表与日志里能看到；文件属性 `ProductVersion = 1.2.1-fika.4`），插件 GUID 仍是 `Mattexe.BossNotifier`，所以配置文件名不变。
+修复版版本号 **`1.2.1.5`**（BepInEx 插件列表与日志里能看到；文件属性 `ProductVersion = 1.2.1-fika.5`），插件 GUID 仍是 `Mattexe.BossNotifier`，所以配置文件名不变。
 
 下载：见 [Releases](https://github.com/wangbofan/SPT-BossNotifier-FikaFix/releases)，或直接取仓库里的 `dist/BossNotifier.dll`。
 
@@ -77,6 +77,18 @@ Resources.FindObjectsOfTypeAll<BotZone>()
 区域名还会**延迟补解析**：开局那一刻 `BotZone` 可能还没加载完，`bossesInRaid` 里会先留下空区域名；之后每次生成提示（按 O、附近播报、boss 死亡）都会用 boss **首次被看到时的坐标**再查一次，补上就写回 `bossesInRaid`。
 
 这样客户端也能给出区域名，而不是只播 “X has been located.”。
+
+#### 1.2.1.5：区域名查不到时退化成「距离 + 方位」
+
+实测部分 Fika 客户端场景里 `BotZone` 一个都拿不到（日志会打 `No BotZone found yet :: LoadedScenes=… allBotZone=0 allSpm=…`）。为了让提示永远说得出「在哪」，加了兜底：区域名为空时，用 boss 位置相对**本机玩家**的直线距离和八方位播报：
+
+```
+Kollontay has been located near Cinema. ✓        ← 区域名查到了
+Kollontay has been located 240m NE. ✓            ← 只有坐标
+Kollontay has been located right next to you. ✓  ← 25 米内
+```
+
+集群 boss（Goons）取离玩家最近的那个成员。距离算的是水平面距离（忽略 Y 轴高差），方位以正北为 0°、顺时针每 45° 一档。
 
 ### `BossNotifierMono.cs`（改动）
 

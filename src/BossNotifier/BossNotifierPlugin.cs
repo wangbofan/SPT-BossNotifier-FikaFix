@@ -16,7 +16,7 @@ using Object = UnityEngine.Object;
 
 namespace BossNotifier;
 
-[BepInPlugin("Mattexe.BossNotifier", "BossNotifier", "1.2.1.4")]
+[BepInPlugin("Mattexe.BossNotifier", "BossNotifier", "1.2.1.5")]
 [BepInDependency("com.fika.core", BepInDependency.DependencyFlags.SoftDependency)]
 public class BossNotifierPlugin : BaseUnityPlugin
 {

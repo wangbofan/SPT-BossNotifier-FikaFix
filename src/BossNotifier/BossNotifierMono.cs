@@ -855,7 +855,8 @@ public class BossNotifierMono : MonoBehaviour
 					}
 					else
 					{
-						item = ((flag2 && text != null && !text.Equals("")) ? ("Goons have been located near " + text + "." + ((flag3 & flag5) ? " ✓" : "")) : ("Goons have been located." + ((flag3 & flag5) ? " ✓" : "")));
+						string text3 = (flag2 ? BuildLocationPhrase(text, "Knight", "Big Pipe", "Birdeye") : string.Empty);
+						item = "Goons have been located" + text3 + "." + ((flag3 & flag5) ? " ✓" : "");
 					}
 					bossNotificationMessages.Add(item);
 					flag4 = true;
@@ -871,10 +872,111 @@ public class BossNotifierMono : MonoBehaviour
 			}
 			else
 			{
-				item2 = ((flag2 && item3.Value != null && !item3.Value.Equals("")) ? (item3.Key + " " + (BossNotifierPlugin.pluralBosses.Contains(item3.Key) ? "have" : "has") + " been located near " + item3.Value + "." + ((flag3 & flag6) ? " ✓" : "")) : (item3.Key + " " + (BossNotifierPlugin.pluralBosses.Contains(item3.Key) ? "have" : "has") + " been located." + ((flag3 & flag6) ? " ✓" : "")));
+				string locationPhrase = (flag2 ? BuildLocationPhrase(item3.Value, item3.Key) : string.Empty);
+				item2 = item3.Key + " " + (BossNotifierPlugin.pluralBosses.Contains(item3.Key) ? "have" : "has") + " been located" + locationPhrase + "." + ((flag3 & flag6) ? " ✓" : "");
 			}
 			bossNotificationMessages.Add(item2);
 		}
+	}
+
+	private static readonly string[] CompassNames = new string[8] { "N", "NE", "E", "SE", "S", "SW", "W", "NW" };
+
+	private Player GetLocalPlayer()
+	{
+		GameWorld gameWorld = _gameWorld;
+		if ((Object)(object)gameWorld == (Object)null)
+		{
+			gameWorld = Singleton<GameWorld>.Instance;
+		}
+		if ((Object)(object)gameWorld == (Object)null)
+		{
+			return null;
+		}
+		return gameWorld.MainPlayer;
+	}
+
+	private bool TryGetNearestGroupPosition(string[] groupNames, out Vector3 position)
+	{
+		position = Vector3.zero;
+		if (groupNames == null || groupNames.Length == 0 || _bossMarkers.Count == 0)
+		{
+			return false;
+		}
+		Player localPlayer = GetLocalPlayer();
+		bool flag = false;
+		float num = float.MaxValue;
+		foreach (KeyValuePair<Player, BossMarkerInfo> bossMarker in _bossMarkers)
+		{
+			BossMarkerInfo value = bossMarker.Value;
+			if (value == null || string.IsNullOrEmpty(value.GroupName))
+			{
+				continue;
+			}
+			bool flag2 = false;
+			for (int i = 0; i < groupNames.Length; i++)
+			{
+				if (value.GroupName == groupNames[i])
+				{
+					flag2 = true;
+					break;
+				}
+			}
+			if (!flag2 || (Object)(object)bossMarker.Key == (Object)null)
+			{
+				continue;
+			}
+			Vector3 vector = bossMarker.Key.Position;
+			float num2 = (((Object)(object)localPlayer == (Object)null) ? 0f : (vector - localPlayer.Position).sqrMagnitude);
+			if (!flag || num2 < num)
+			{
+				num = num2;
+				position = vector;
+				flag = true;
+			}
+		}
+		return flag;
+	}
+
+	/// <summary>
+	/// 位置短语。
+	///
+	/// 首选区域名（“ near Cinema”）。查不到区域名时——Fika 客户端可能根本没有 BotZone 组件——
+	/// 退化成相对本机玩家的距离 + 方位（“ 240m NE”），保证提示里永远说得出“在哪”。
+	/// </summary>
+	private string BuildLocationPhrase(string zone, params string[] groupNames)
+	{
+		if (!string.IsNullOrEmpty(zone))
+		{
+			return " near " + zone;
+		}
+		Vector3 position;
+		if (!TryGetNearestGroupPosition(groupNames, out position))
+		{
+			return string.Empty;
+		}
+		Player localPlayer = GetLocalPlayer();
+		if ((Object)(object)localPlayer == (Object)null)
+		{
+			return string.Empty;
+		}
+		Vector3 vector = position - localPlayer.Position;
+		Vector2 vector2 = new Vector2(vector.x, vector.z);
+		float magnitude = vector2.magnitude;
+		if (magnitude < 1f)
+		{
+			return string.Empty;
+		}
+		if (magnitude < 25f)
+		{
+			return " right next to you";
+		}
+		float num = Mathf.Atan2(vector2.x, vector2.y) * 57.29578f;
+		if (num < 0f)
+		{
+			num += 360f;
+		}
+		int num2 = Mathf.RoundToInt(num / 45f) % 8;
+		return $" {magnitude:F0}m {CompassNames[num2]}";
 	}
 
 	private bool IsDay()
