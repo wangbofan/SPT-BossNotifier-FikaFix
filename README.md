@@ -4,6 +4,10 @@
 
 这个仓库是修复版，**替换原来的 `BossNotifier.dll` 即可**，配置文件与 `custom_bosses.json` 全部兼容，不需要重新配置。
 
+修复版版本号 **`1.2.1.3`**（BepInEx 插件列表与日志里能看到；文件属性 `ProductVersion = 1.2.1-fika.3`），插件 GUID 仍是 `Mattexe.BossNotifier`，所以配置文件名不变。
+
+下载：见 [Releases](https://github.com/wangbofan/SPT-BossNotifier-FikaFix/releases)，或直接取仓库里的 `dist/BossNotifier.dll`。
+
 ---
 
 ## 根因
